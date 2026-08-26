@@ -18,3 +18,17 @@
 *.woff2 binary
 *.ttf binary
 *.otf binary
+
+# 其余常见二进制格式
+*.pdf binary
+*.doc binary
+*.xlsx binary
+*.zip binary
+*.rar binary
+*.tar binary
+*.gz binary
+*.7z binary
+*.wav binary
+*.mp3 binary
+*.mp4 binary
+*.eot binary

@@ -38,3 +38,13 @@ Thumbs.db
 
 data/cleaned/*
 !data/cleaned/.gitkeep
+
+# ===== 密钥与证书（防止误提交）=====
+*.pem
+*.key
+*.crt
+*.p12
+
+# ===== Windows 系统文件 =====
+ehthumbs.db
+Desktop.ini
