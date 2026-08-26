@@ -50,6 +50,9 @@
   border-radius: 10px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   padding: 20px;
+  // 宽表格（min-width 1000px+）在任意窗口宽度下都在卡片内横向滚动，避免冲出卡片边界
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .card-title {
@@ -105,7 +108,6 @@
   }
 
   // 表格窄屏横向滚动：卡片容器允许横向滚动，表格设最小宽度避免列被压缩
-  .info-card,
   .el-card {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
