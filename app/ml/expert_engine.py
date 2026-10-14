@@ -45,7 +45,8 @@ def _parse_num(value: Any) -> float | None:
     if value is None or value == "":
         return None
     try:
-        return float(value)
+        number = float(value)
+        return number if math.isfinite(number) else None
     except (TypeError, ValueError):
         return None
 
@@ -107,19 +108,47 @@ def _score_bool(value: Any, indicator: IndicatorConfig) -> float:
     return 40.0
 
 
-def _score_value(value: float, indicator: IndicatorConfig) -> float:
-    """数值指标 → 0-100。支持『越高越好』与『越低越好』。"""
+def _lower_better(indicator: IndicatorConfig) -> bool:
     cfg = indicator.scoring_config or {}
     rule = (indicator.scoring_rule or "") + " " + (indicator.name or "")
     # 越低越好判定：显式配置 > 规则/名称语义（负债率/风险/负担/频次等越高越差）
     lower_better = cfg.get("lower_better", False)
     if not lower_better and "越高越好" not in rule:
         lower_better = any(kw in rule for kw in ("越低", "风险越高", "越高越差", "越高风险", "越高越不利"))
+    return bool(lower_better)
+
+
+def _score_value(value: float, indicator: IndicatorConfig) -> float:
+    """数值指标 → 0-100。支持『越高越好』与『越低越好』。"""
+    lower_better = _lower_better(indicator)
     ref = _ref_max(indicator)
     if ref <= 0:
         ref = 100.0
     ratio = min(max(value / ref, 0.0), 1.0)
     return round((1 - ratio) * 100 if lower_better else ratio * 100, 1)
+
+
+def describe_scoring(indicator: IndicatorConfig) -> str:
+    """返回当前计分规则，避免把配置文档中的规划描述当成已执行算法。"""
+    if indicator.is_veto:
+        return "命中否决项即不予授信；否决核验不参与加权计分。"
+    if indicator.indicator_type == "文本":
+        return "备注与身份核对信息，不参与加权计分。"
+    mapping = (indicator.scoring_config or {}).get("map") or {}
+    if mapping:
+        return "当前选项计分：" + "；".join(f"{option} = {score:g} 分" for option, score in mapping.items())
+    if indicator.indicator_type == "数值":
+        ref = _ref_max(indicator)
+        ref = ref if ref > 0 else 100.0
+        direction = (
+            "越低越好，按 (1 - 取值 / 参考上限) × 100"
+            if _lower_better(indicator)
+            else "越高越好，按取值 / 参考上限 × 100"
+        )
+        return f"当前参考上限 {ref:g} {indicator.unit or ''}；{direction} 计分，得分限制在 0 到 100。"
+    if indicator.indicator_type == "布尔":
+        return "当前默认计分：是 = 100 分，否 = 40 分。"
+    return "当前按选项顺序与正负面关键词映射为 0 到 100 分。"
 
 
 def score_indicator(value: Any, indicator: IndicatorConfig) -> float | None:
@@ -138,8 +167,19 @@ def score_indicator(value: Any, indicator: IndicatorConfig) -> float | None:
             return None
         return _score_value(num, indicator)
     if t == "枚举":
+        options = _parse_options(indicator.value_range)
+        mapping = (indicator.scoring_config or {}).get("map") or {}
+        if options and str(value).strip() not in options and str(value).strip() not in mapping:
+            return None
         return _score_enum(str(value).strip(), indicator)
     if t == "布尔":
+        v = str(value).strip()
+        mapping = (indicator.scoring_config or {}).get("map") or {}
+        if (
+            v not in ("是", "否", "true", "false", "True", "False", "1", "0", "有", "无", "命中", "存在")
+            and v not in mapping
+        ):
+            return None
         return _score_bool(value, indicator)
     return None
 
@@ -187,9 +227,7 @@ def _adjustment(indicator: IndicatorConfig, business_type: str, level_weights: d
     if indicator.is_feature:
         # 特色指标加成（暂固定 1.1，后续可按经营类型配置）
         adj *= 1.1
-    # 区域匹配：东北全境视为全覆盖，其余按业务配置扩展（v1 简单处理）
-    if indicator.region and indicator.region != "东北全境":
-        adj *= 1.0  # 区域加成占位，后续可在 business_type_config.region_boost 配置
+    # 区域标签只说明适用范围，不在缺少经营地区输入时推断区域加分。
     return adj
 
 
@@ -239,7 +277,7 @@ def expert_assess(
     scored: list[tuple[IndicatorConfig, float]] = []
     for code in codes:
         cfg = configs.get(code)
-        if not cfg:
+        if not cfg or cfg.is_veto:
             continue
         s = score_indicator(indicators[code], cfg)
         if s is not None:
@@ -312,6 +350,7 @@ def expert_assess(
     # 贡献与扣分
     contributions = [
         {
+            "code": code,
             "factor": name,
             "category": configs.get(code).level if configs.get(code) else "未知",
             "weight": round(w / total_w, 4),
@@ -320,7 +359,10 @@ def expert_assess(
         for (w, s, code, name) in weighted_items
     ]
     deductions = sorted(
-        [{"factor": name, "score": s, "reason": _deduct_reason(s)} for (_w, s, _c, name) in weighted_items],
+        [
+            {"code": code, "factor": name, "score": s, "reason": _deduct_reason(s)}
+            for (_w, s, code, name) in weighted_items
+        ],
         key=lambda x: x["score"],
     )[:3]
 

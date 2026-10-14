@@ -80,6 +80,17 @@ function levelTag(level: string) {
   return level === '低风险' ? 'success' : level === '中等风险' ? 'warning' : 'danger'
 }
 
+function alertTag(severity: string) {
+  return severity === 'veto' ? 'danger' : 'warning'
+}
+
+function transparencyStatus(status: string) {
+  return (
+    ({ provided: '已提供', missing: '缺失', invalid: '无效', unscored: '未计分' } as Record<string, string>)[status] ||
+    status
+  )
+}
+
 async function showDetail(row: AssessmentRecord) {
   try {
     detail.value = await getRecord(row.id)
@@ -113,15 +124,22 @@ onMounted(() => {
     <div v-if="stats" class="backtest-card info-card">
       <div class="backtest-head">
         <b>真实回测</b>
-        <span class="backtest-sub">已回填 {{ stats.filled }}/{{ stats.total }} 条 · 现实版指标基于人工回填的真实放款结果（记录列表「回填」维护）</span>
+        <span class="backtest-sub"
+          >已回填 {{ stats.filled }}/{{ stats.total }} 条 ·
+          现实版指标基于人工回填的真实放款结果（记录列表「回填」维护）</span
+        >
       </div>
       <div class="backtest-grid">
         <div class="bt-item">
-          <div class="bt-value">{{ stats.precisionHighRisk != null ? (stats.precisionHighRisk * 100).toFixed(1) + '%' : '-' }}</div>
+          <div class="bt-value">
+            {{ stats.precisionHighRisk != null ? (stats.precisionHighRisk * 100).toFixed(1) + '%' : '-' }}
+          </div>
           <div class="bt-label">精确率 · 判高风险中实际逾期</div>
         </div>
         <div class="bt-item">
-          <div class="bt-value">{{ stats.recallOverdue != null ? (stats.recallOverdue * 100).toFixed(1) + '%' : '-' }}</div>
+          <div class="bt-value">
+            {{ stats.recallOverdue != null ? (stats.recallOverdue * 100).toFixed(1) + '%' : '-' }}
+          </div>
           <div class="bt-label">召回率 · 实际逾期中被判高风险</div>
         </div>
         <div class="bt-item">
@@ -244,6 +262,12 @@ onMounted(() => {
           <el-descriptions-item v-if="detail.completeness != null" label="数据完整度">
             {{ (detail.completeness * 100).toFixed(0) }}%
           </el-descriptions-item>
+          <el-descriptions-item v-if="detail.engineUsage" label="专家引擎调用">
+            {{ detail.engineUsage.expertCalls }} 次
+          </el-descriptions-item>
+          <el-descriptions-item v-if="detail.engineUsage" label="数据层融合应用">
+            {{ detail.engineUsage.dataLayerApplications }} 次
+          </el-descriptions-item>
           <el-descriptions-item v-if="detail.assessorName" label="评估人">{{
             detail.assessorName
           }}</el-descriptions-item>
@@ -255,6 +279,64 @@ onMounted(() => {
         <template v-if="detail.veto">
           <h4 style="margin: 18px 0 10px">一票否决</h4>
           <el-alert :title="detail.veto" type="error" :closable="false" show-icon />
+        </template>
+
+        <template v-if="detail.riskAlerts?.length">
+          <h4 style="margin: 18px 0 10px">风险提示（{{ detail.riskAlerts.length }} 项）</h4>
+          <div class="alert-list">
+            <el-alert
+              v-for="(alert, index) in detail.riskAlerts"
+              :key="`${index}-${alert.code}`"
+              :title="alert.factor"
+              :description="alert.reason"
+              :type="alertTag(alert.severity)"
+              :closable="false"
+              show-icon
+            />
+          </div>
+        </template>
+
+        <template v-if="detail.overrides?.length">
+          <h4 style="margin: 18px 0 10px">触发规则</h4>
+          <div class="override-list">
+            <el-tag v-for="(item, index) in detail.overrides" :key="`${index}-${item}`" type="warning" effect="plain">
+              {{ item }}
+            </el-tag>
+          </div>
+        </template>
+
+        <template v-if="detail.transparency">
+          <h4 style="margin: 18px 0 10px">数据透明度</h4>
+          <el-alert
+            :title="`${detail.transparency.confidenceLabel} · 有效覆盖度 ${(detail.transparency.confidence * 100).toFixed(0)}%`"
+            :description="detail.transparency.confidenceExplanation"
+            type="info"
+            :closable="false"
+          />
+          <el-descriptions :column="3" border size="small" style="margin-top: 10px">
+            <el-descriptions-item label="应评估">{{ detail.transparency.expectedCount }}</el-descriptions-item>
+            <el-descriptions-item label="已提供">{{ detail.transparency.providedCount }}</el-descriptions-item>
+            <el-descriptions-item label="已计分">{{ detail.transparency.scoredCount }}</el-descriptions-item>
+          </el-descriptions>
+          <el-table :data="detail.transparency.indicators" size="small" max-height="360" style="margin-top: 10px">
+            <el-table-column prop="name" label="指标" min-width="150" show-overflow-tooltip />
+            <el-table-column label="输入值" min-width="95">
+              <template #default="{ row }">{{ row.value ?? '-' }}{{ row.unit ? ` ${row.unit}` : '' }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template #default="{ row }">
+                <el-tag
+                  :type="row.status === 'provided' ? 'success' : row.status === 'missing' ? 'danger' : 'warning'"
+                  size="small"
+                >
+                  {{ transparencyStatus(row.status) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="dataSource" label="配置来源" min-width="140" show-overflow-tooltip />
+            <el-table-column prop="riskMeaning" label="风险含义" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="scoringRule" label="计分规则" min-width="170" show-overflow-tooltip />
+          </el-table>
         </template>
 
         <!-- 混合经营构成 -->
@@ -298,9 +380,22 @@ onMounted(() => {
         </template>
 
         <!-- 主要扣分项 -->
-        <template v-if="detail.result?.deductions?.length">
+        <template v-if="detail.contributions?.length">
+          <h4 style="margin: 18px 0 10px">评分贡献（{{ detail.contributions.length }} 项）</h4>
+          <el-table :data="detail.contributions" size="small" max-height="320">
+            <el-table-column prop="code" label="编码" width="110" />
+            <el-table-column prop="factor" label="指标" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="category" label="类别" min-width="110" show-overflow-tooltip />
+            <el-table-column label="权重" width="90" align="right">
+              <template #default="{ row }">{{ (row.weight * 100).toFixed(1) }}%</template>
+            </el-table-column>
+            <el-table-column prop="score" label="得分" width="80" align="right" />
+          </el-table>
+        </template>
+
+        <template v-if="detail.deductions?.length || detail.result?.deductions?.length">
           <h4 style="margin: 18px 0 10px">主要扣分项</h4>
-          <el-table :data="detail.result.deductions" size="small">
+          <el-table :data="detail.deductions || detail.result.deductions" size="small">
             <el-table-column prop="factor" label="指标" />
             <el-table-column prop="score" label="得分" width="80" />
             <el-table-column prop="reason" label="原因" />
@@ -348,6 +443,17 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   margin-bottom: 16px;
+}
+
+.override-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.alert-list {
+  display: grid;
+  gap: 8px;
 }
 
 // 真实回测统计卡片

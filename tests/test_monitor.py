@@ -36,6 +36,66 @@ def test_admin_stats(client, auth_headers):
     assert body["data"]["users"] >= 1
 
 
+def test_admin_dashboard_is_private_and_uses_persisted_activity(client, auth_headers):
+    from tests.conftest import SAMPLE_INPUT
+
+    assert client.get("/api/v1/admin/dashboard").json()["code"] == 401
+    created = client.post(
+        "/api/v1/admin/users",
+        json={"username": "dashboard_analyst", "password": "test123", "role": "analyst"},
+        headers=auth_headers,
+    )
+    assert created.json()["code"] == 200
+    analyst_login = client.post("/api/v1/auth/login", json={"username": "dashboard_analyst", "password": "test123"})
+    analyst_headers = {"Authorization": f"Bearer {analyst_login.json()['data']['token']}"}
+    assert client.get("/api/v1/admin/dashboard", headers=analyst_headers).json()["code"] == 403
+
+    payload = {**SAMPLE_INPUT, "enterpriseName": "看板契约记录"}
+    assessed = client.post("/api/v1/risk/assess-dynamic", json=payload, headers=auth_headers)
+    assert assessed.json()["code"] == 200
+    result = assessed.json()["data"]
+    assert isinstance(result.get("contributions"), list)
+    assert isinstance(result.get("deductions"), list)
+    assert isinstance(result.get("overrides"), list)
+    assert "veto" in result and "completeness" in result
+    assert "riskAlerts" in result and "transparency" in result
+
+    record_list = client.get(
+        "/api/v1/risk/records",
+        params={"keyword": "看板契约记录", "page": 1, "size": 10},
+        headers=auth_headers,
+    ).json()["data"]
+    record = next(item for item in record_list["items"] if item["enterpriseName"] == "看板契约记录")
+    detail = client.get(f"/api/v1/risk/records/{record['id']}", headers=auth_headers).json()["data"]
+    for field in ("contributions", "deductions", "overrides", "riskAlerts", "transparency", "engineUsage"):
+        assert detail[field] == result[field]
+    assert detail["completeness"] == result["completeness"]
+
+    before = client.get("/api/v1/admin/dashboard", headers=auth_headers).json()["data"]
+    invalid = client.post("/api/v1/risk/assess-dynamic", json={"businessType": "invalid"}, headers=auth_headers)
+    assert invalid.status_code == 200 and invalid.json()["code"] == 422
+    after = client.get("/api/v1/admin/dashboard", headers=auth_headers).json()["data"]
+    assert after["assessmentApiRequests"]["failed"] == before["assessmentApiRequests"]["failed"] + 1
+    assert after["assessmentApiRequests"]["succeeded"] == before["assessmentApiRequests"]["succeeded"]
+    assert after["engineUsage"]["expertCalls"] == before["engineUsage"]["expertCalls"]
+
+    dashboard = client.get("/api/v1/admin/dashboard", headers=auth_headers, params={"days": 14})
+    assert dashboard.json()["code"] == 200
+    stats = dashboard.json()["data"]
+    assert stats["assessmentTotal"] >= 1
+    assert stats["userBehavior"]["registeredAssessments"] >= 1
+    assert stats["userBehavior"]["activeUsers"] >= 1
+    assert stats["engineUsage"]["expertCalls"] >= 1
+    assert stats["engineUsage"]["trackedAssessments"] >= 1
+    assert stats["engineUsage"]["untrackedAssessments"] >= 0
+    assert len(stats["engineUsage"]["daily"]) == 14
+    assert stats["assessmentApiRequests"]["total"] >= 1
+    assert stats["assessmentApiRequests"]["succeeded"] >= 1
+    assert stats["assessmentApiRequests"]["failed"] >= 0
+    assert stats["assessmentApiRequests"]["endpoint"] == "POST /risk/assess-dynamic"
+    assert len(stats["assessmentTrend"]) == 14
+
+
 def test_admin_users_crud(client, auth_headers):
     # 创建
     r = client.post(

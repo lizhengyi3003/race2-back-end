@@ -22,7 +22,8 @@ class IndicatorAdminOut(BaseModel):
     is_feature: bool = False
     risk_meaning: str = ""
     weight_star: float = 3.0
-    region: str = ""
+    region: str = "全国通用"
+    region_tags: list[str] = []
     is_veto: bool = False
     cycle: str = ""
     scoring_rule: str = ""
@@ -47,6 +48,7 @@ class IndicatorAdminOut(BaseModel):
             risk_meaning=c.risk_meaning,
             weight_star=c.weight_star,
             region=c.region,
+            region_tags=c.region_tags or [],
             is_veto=c.is_veto,
             cycle=c.cycle,
             scoring_rule=c.scoring_rule,
@@ -66,7 +68,8 @@ class IndicatorUpdate(BaseModel):
     is_feature: bool | None = None
     risk_meaning: str | None = None
     weight_star: float | None = None
-    region: str | None = None
+    region: Literal["全国通用", "区域可配置", "示例：东北"] | None = None
+    region_tags: list[str] | None = None
     is_veto: bool | None = None
     cycle: str | None = None
     scoring_rule: str | None = None

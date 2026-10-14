@@ -11,6 +11,7 @@ from app.models.indicator import IndicatorCategory, IndicatorConfig
 from app.schemas.common import PageData
 from app.schemas.indicator import CategoryNode, IndicatorField, IndicatorTree
 from app.schemas.indicator_admin import IndicatorAdminOut, IndicatorStats, IndicatorUpdate
+from app.services.indicator_regions import normalize_tag_values
 
 # 枚举取值说明中用于分隔选项的符号
 _OPTION_SEP = ["/", "／", "、", "，"]
@@ -80,6 +81,7 @@ def _to_field(c: IndicatorConfig) -> IndicatorField:
         risk_meaning=c.risk_meaning,
         weight_star=c.weight_star,
         region=c.region,
+        region_tags=c.region_tags or [],
         is_veto=c.is_veto,
         cycle=c.cycle,
         scoring_rule=c.scoring_rule,
@@ -192,6 +194,8 @@ def update_indicator(db: Session, code: str, req: IndicatorUpdate) -> IndicatorA
     if not c:
         raise BizException("指标不存在", 404)
     data = req.model_dump(exclude_unset=True)
+    if "region_tags" in data and data["region_tags"] is not None:
+        data["region_tags"] = normalize_tag_values(data["region_tags"])
     for k, v in data.items():
         setattr(c, k, v)
     db.commit()

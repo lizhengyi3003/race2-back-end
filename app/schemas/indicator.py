@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 
 class IndicatorField(BaseModel):
-    """动态表单字段配置（对应 indicator_config 14 列 + 派生选项）。"""
+    """动态表单字段配置（对应 indicator_config 15 列 + 派生选项）。"""
 
     code: str
     name: str
@@ -21,7 +21,8 @@ class IndicatorField(BaseModel):
     is_feature: bool = False
     risk_meaning: str = ""
     weight_star: float = 3.0
-    region: str = ""
+    region: str = "全国通用"
+    region_tags: list[str] = []
     is_veto: bool = False
     cycle: str = ""
     scoring_rule: str = ""

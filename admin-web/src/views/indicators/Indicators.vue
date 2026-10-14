@@ -75,7 +75,8 @@ const editForm = reactive<Record<string, any>>({
   is_feature: false,
   risk_meaning: '',
   weight_star: 3,
-  region: '',
+  region: '全国通用',
+  region_tags: '',
   is_veto: false,
   cycle: '',
   scoring_rule: '',
@@ -85,6 +86,7 @@ const editForm = reactive<Record<string, any>>({
 
 const typeOptions = ['数值', '枚举', '布尔', '文本']
 const cycleOptions = ['年报', '季报', '月报', '实时']
+const regionOptions = ['全国通用', '区域可配置', '示例：东北']
 
 function openEdit(row: IndicatorItem) {
   Object.assign(editForm, {
@@ -99,6 +101,7 @@ function openEdit(row: IndicatorItem) {
     risk_meaning: row.risk_meaning,
     weight_star: row.weight_star,
     region: row.region,
+    region_tags: (row.region_tags || []).join('；'),
     is_veto: row.is_veto,
     cycle: row.cycle,
     scoring_rule: row.scoring_rule,
@@ -138,6 +141,10 @@ async function save() {
       risk_meaning: editForm.risk_meaning,
       weight_star: editForm.weight_star,
       region: editForm.region,
+      region_tags: String(editForm.region_tags)
+        .split(/[;；,，、\n]+/)
+        .map((tag: string) => tag.trim())
+        .filter(Boolean),
       is_veto: editForm.is_veto,
       cycle: editForm.cycle,
       scoring_rule: editForm.scoring_rule,
@@ -286,6 +293,10 @@ async function toggleVeto(row: IndicatorItem) {
             <el-tag v-if="row.is_veto" type="danger" size="small" effect="plain">一票否决</el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="region" label="适用范围" width="120" show-overflow-tooltip />
+        <el-table-column label="区域标签" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ (row.region_tags || []).join('、') || '—' }}</template>
+        </el-table-column>
         <el-table-column prop="data_source" label="数据来源" width="140" show-overflow-tooltip />
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
@@ -344,8 +355,18 @@ async function toggleVeto(row: IndicatorItem) {
             <el-option v-for="c in cycleOptions" :key="c" :label="c" :value="c" />
           </el-select>
         </el-form-item>
-        <el-form-item label="适用区域">
-          <el-input v-model="editForm.region" placeholder="如 东北 / 全国" />
+        <el-form-item label="适用范围">
+          <el-select v-model="editForm.region" style="width: 100%">
+            <el-option v-for="r in regionOptions" :key="r" :label="r" :value="r" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="区域标签">
+          <el-input
+            v-model="editForm.region_tags"
+            type="textarea"
+            :rows="3"
+            placeholder="省份或农业区，使用顿号、逗号或分号分隔"
+          />
         </el-form-item>
         <el-form-item label="数据来源">
           <el-input v-model="editForm.data_source" type="textarea" :rows="2" />

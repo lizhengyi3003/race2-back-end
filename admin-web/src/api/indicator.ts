@@ -17,6 +17,7 @@ export interface IndicatorItem {
   risk_meaning: string
   weight_star: number
   region: string
+  region_tags: string[]
   is_veto: boolean
   cycle: string
   scoring_rule: string

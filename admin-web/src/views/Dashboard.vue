@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import StatCard from '@/components/StatCard.vue'
-import { getSystemOverview } from '@/api/admin'
-import { getIndustryDistribution, getScoreDistribution, getTrend } from '@/api/risk'
+import { getAdminDashboard, getSystemOverview, type AdminDashboardStats } from '@/api/admin'
+import { getIndustryDistribution, getScoreDistribution } from '@/api/risk'
 import { getServerStatus, getHealth } from '@/api/monitor'
 
 const overview = ref<any>(null)
 const server = ref<any>(null)
 const health = ref<any>(null)
+const adminDashboard = ref<AdminDashboardStats | null>(null)
 
 const trendChartRef = ref<HTMLElement>()
+const callsChartRef = ref<HTMLElement>()
 const scoreChartRef = ref<HTMLElement>()
 const industryChartRef = ref<HTMLElement>()
 
@@ -148,23 +150,58 @@ function renderIndustry(data: any[]) {
   )
 }
 
+function renderEngineUsage(data: AdminDashboardStats['engineUsage']['daily']) {
+  const chart = getChart('engineUsage', callsChartRef.value)
+  if (!chart) return
+  chart.setOption(
+    {
+      tooltip: { trigger: 'axis' },
+      legend: { data: ['专家引擎调用', '数据层融合应用'], top: 0 },
+      grid: { top: 42, right: 24, bottom: 42, left: 48 },
+      xAxis: { type: 'category', data: data.map((item) => item.date.slice(5)), axisLabel: { color: '#909399' } },
+      yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: '#f0f2f5' } } },
+      series: [
+        {
+          name: '专家引擎调用',
+          type: 'bar',
+          data: data.map((item) => item.expertCalls),
+          itemStyle: { color: '#4361ee' },
+        },
+        {
+          name: '数据层融合应用',
+          type: 'bar',
+          data: data.map((item) => item.dataLayerApplications),
+          itemStyle: { color: '#e6a23c' },
+        },
+      ],
+    },
+    { notMerge: true }
+  )
+}
+
 async function load() {
   // 各接口独立容错：单个接口失败不影响其他数据的刷新
-  const [ov, srv, hlt] = await Promise.allSettled([getSystemOverview(), getServerStatus(), getHealth()])
+  const [ov, srv, hlt, stats] = await Promise.allSettled([
+    getSystemOverview(),
+    getServerStatus(),
+    getHealth(),
+    getAdminDashboard(14),
+  ])
   if (ov.status === 'fulfilled') overview.value = ov.value
   if (srv.status === 'fulfilled') server.value = srv.value
   if (hlt.status === 'fulfilled') health.value = hlt.value
+  if (stats.status === 'fulfilled') adminDashboard.value = stats.value
+  await nextTick()
 
   // 图表数据（单个失败时保留上次渲染）
   try {
-    const [industry, scoreDist, trend] = await Promise.all([
-      getIndustryDistribution(),
-      getScoreDistribution(),
-      getTrend(14),
-    ])
+    const [industry, scoreDist] = await Promise.all([getIndustryDistribution(), getScoreDistribution()])
     renderIndustry(industry)
     renderScoreDist(scoreDist)
-    renderTrend(trend)
+    if (stats.status === 'fulfilled') {
+      renderTrend(stats.value.assessmentTrend)
+      renderEngineUsage(stats.value.engineUsage.daily)
+    }
     chartInstances.forEach((c) => c.resize())
   } catch {
     // 忽略
@@ -209,6 +246,38 @@ onUnmounted(() => {
       />
       <StatCard title="CPU 使用率" :value="server ? server.cpu.percent + '%' : '-'" icon="Monitor" color="#e6a23c" />
       <StatCard title="内存使用率" :value="server ? server.memory.percent + '%' : '-'" icon="Coin" color="#9b5de5" />
+    </div>
+
+    <div v-if="adminDashboard" class="metric-grid business-metrics">
+      <StatCard
+        title="近 14 天评估"
+        :value="adminDashboard.assessmentTotal"
+        unit="次"
+        icon="DataAnalysis"
+        color="#4c956c"
+      />
+      <StatCard
+        title="平均数据完整度"
+        :value="
+          adminDashboard.averageCompleteness == null ? '-' : (adminDashboard.averageCompleteness * 100).toFixed(1) + '%'
+        "
+        icon="CircleCheck"
+        color="#4361ee"
+      />
+      <StatCard
+        title="账号评估用户"
+        :value="adminDashboard.userBehavior.activeUsers"
+        unit="人"
+        icon="UserFilled"
+        color="#9b5de5"
+      />
+      <StatCard
+        title="专家引擎调用"
+        :value="adminDashboard.engineUsage.expertCalls"
+        unit="次"
+        icon="Cpu"
+        color="#e76f51"
+      />
     </div>
 
     <el-row :gutter="16">
@@ -270,6 +339,52 @@ onUnmounted(() => {
         </div>
       </el-col>
     </el-row>
+
+    <el-row v-if="adminDashboard" :gutter="16" style="margin-top: 16px">
+      <el-col :xs="24" :md="14">
+        <div class="info-card">
+          <h3 class="card-title">近 14 天实际评估引擎调用</h3>
+          <p class="chart-note">
+            专家评估 {{ adminDashboard.engineUsage.expertCalls }} 次，数据层融合应用
+            {{ adminDashboard.engineUsage.dataLayerApplications }} 次；调用有记录
+            {{ adminDashboard.engineUsage.trackedAssessments }} 条评估，旧记录未跟踪
+            {{ adminDashboard.engineUsage.untrackedAssessments }} 条。
+          </p>
+          <p class="chart-note">
+            接口日志另记录 {{ adminDashboard.assessmentApiRequests.total }} 次 POST /risk/assess-dynamic 请求，其中
+            {{ adminDashboard.assessmentApiRequests.succeeded }} 次 HTTP 2xx、{{
+              adminDashboard.assessmentApiRequests.failed
+            }}
+            次非 2xx；包含校验失败请求。 另有 {{ adminDashboard.assessmentApiRequests.unknown }} 次缺少业务码的请求。
+          </p>
+          <div ref="callsChartRef" style="width: 100%; height: 300px" />
+        </div>
+      </el-col>
+      <el-col :xs="24" :md="10">
+        <div class="info-card">
+          <h3 class="card-title">评估与账号行为</h3>
+          <div class="behavior-summary">
+            <span>近 14 天均分 {{ adminDashboard.averageScore }}</span>
+            <span
+              >低 / 中 / 高风险 {{ adminDashboard.lowRiskCount }} / {{ adminDashboard.midRiskCount }} /
+              {{ adminDashboard.highRiskCount }}</span
+            >
+            <span>否决 {{ adminDashboard.vetoCount }} 次</span>
+            <span>规则触发 {{ adminDashboard.overrideCount }} 次</span>
+          </div>
+          <div class="behavior-summary">
+            <span>账号评估 {{ adminDashboard.userBehavior.registeredAssessments }} 次</span>
+            <span>匿名评估 {{ adminDashboard.userBehavior.anonymousAssessments }} 次</span>
+            <span>活跃账号 {{ adminDashboard.userBehavior.activeUsers }} 个</span>
+          </div>
+          <el-table :data="adminDashboard.userBehavior.topUsers" size="small" max-height="235">
+            <el-table-column prop="username" label="用户" min-width="130" show-overflow-tooltip />
+            <el-table-column prop="assessmentCount" label="评估次数" width="100" align="right" />
+          </el-table>
+          <p class="chart-note">根据评估记录的账号归属统计，匿名评估单独计数。</p>
+        </div>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -298,5 +413,24 @@ onUnmounted(() => {
       color: #303133;
     }
   }
+}
+
+.business-metrics {
+  margin-top: 16px;
+}
+
+.chart-note {
+  color: #909399;
+  font-size: 12px;
+  margin: -4px 0 8px;
+}
+
+.behavior-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: #606266;
+  font-size: 13px;
+  margin-bottom: 12px;
 }
 </style>

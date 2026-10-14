@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.ml.expert_engine import expert_assess
 from app.models.assessment import AssessmentRecord
 from app.models.indicator import IndicatorValue
+from app.services.transparency_service import enrich_result
 
 
 def _combine_mixed(sub_results: dict[str, tuple[float, dict]], db: Session | None = None) -> dict:
@@ -14,11 +15,15 @@ def _combine_mixed(sub_results: dict[str, tuple[float, dict]], db: Session | Non
     当所选业务组合命中已知协同组合时，评分加成 factor（种养结合/产销一体等）。
     """
     total_ratio = sum(r for r, _ in sub_results.values()) or 1.0
+    # 否决红线不能被其他经营类型的高分、额度或协同加分稀释。
+    veto_result = next((res for _, res in sub_results.values() if res.get("veto")), None)
+    if veto_result is not None:
+        return dict(veto_result)
     score = round(sum(ratio * res["score"] for ratio, res in sub_results.values()) / total_ratio)
     probability = sum(ratio * res["probability"] for ratio, res in sub_results.values()) / total_ratio
 
     # ---- 协同因子叠加 ----
-    overrides: list[str] = []
+    overrides: list[str] = list(dict.fromkeys(o for _, res in sub_results.values() for o in res.get("overrides", [])))
     if db is not None:
         from app.models.indicator import BusinessTypeConfig
 
@@ -96,21 +101,34 @@ def assess_dynamic_and_store(
     business_type = payload.get("businessType", "")
     mixed = payload.get("mixedBusiness", {}) or {}
     selected_categories = payload.get("selectedCategories", []) or []
+    expert_calls = 0
+    data_layer_applications = 0
+    sub_results: dict[str, tuple[float, dict]] = {}
 
     if business_type == "MIXED" and mixed:
-        sub_results: dict[str, tuple[float, dict]] = {}
         for code, ratio in mixed.items():
             if ratio > 0:
+                expert_calls += 1
                 sub_results[code] = (
                     float(ratio),
                     expert_assess(db, code, indicators, selected_categories=selected_categories),
                 )
+                data_layer_applications += sum(
+                    o.startswith("data_layer:") for o in sub_results[code][1].get("overrides", [])
+                )
         if sub_results:
             result = _combine_mixed(sub_results, db)
         else:
+            expert_calls = 1
             result = expert_assess(db, "", indicators, selected_categories=selected_categories)
     else:
+        expert_calls = 1
         result = expert_assess(db, business_type, indicators, selected_categories=selected_categories)
+
+    if not sub_results:
+        data_layer_applications = sum(o.startswith("data_layer:") for o in result.get("overrides", []))
+    result["engineUsage"] = {"expertCalls": expert_calls, "dataLayerApplications": data_layer_applications}
+    enrich_result(db, payload, result)
 
     # 落库：动态输入/结果快照 + 指标明细
     rec = AssessmentRecord(

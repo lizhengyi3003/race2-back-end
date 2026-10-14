@@ -1,6 +1,6 @@
-"""动态指标体系模型：指标配置表（文档 14 列 schema）+ 类别树。
+"""动态指标体系模型：指标配置表（文档 15 列 schema）+ 类别树。
 
-数据来源：docs/农业及相关产业动态指标搜集体系.md / .xlsx（775 条指标）。
+数据来源：docs/农业及相关产业动态指标搜集体系.md / .xlsx（3,023 条指标）。
 """
 
 from datetime import datetime
@@ -24,7 +24,7 @@ class IndicatorCategory(Base):
 
 
 class IndicatorConfig(Base):
-    """指标配置：动态表单与评分引擎的元数据（对应文档 14 列）。"""
+    """指标配置：动态表单与评分引擎的元数据（对应文档 15 列）。"""
 
     __tablename__ = "indicator_config"
 
@@ -41,7 +41,8 @@ class IndicatorConfig(Base):
     is_feature: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否特色指标
     risk_meaning: Mapped[str] = mapped_column(String(255), default="")
     weight_star: Mapped[float] = mapped_column(Float, default=3.0)  # 建议权重（星级数值化 3/3.5/4.5/5）
-    region: Mapped[str] = mapped_column(String(64), default="")  # 适用区域
+    region: Mapped[str] = mapped_column(String(64), default="全国通用")  # 全国通用 / 区域可配置 / 示例：东北
+    region_tags: Mapped[list] = mapped_column(JSON, default=list, nullable=True)  # 省份与农业区标签
     is_veto: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否一票否决
     cycle: Mapped[str] = mapped_column(String(8), default="")  # 采集周期：年报/季报/月报/实时
     scoring_rule: Mapped[str] = mapped_column(String(255), default="")  # 评分规则

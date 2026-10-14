@@ -16,8 +16,9 @@ from app.schemas.admin import (
 )
 from app.schemas.auth import UserOut
 from app.schemas.common import PageData
+from app.schemas.dashboard import AdminDashboardStats
 from app.schemas.indicator_admin import IndicatorUpdate
-from app.services import admin_service, indicator_service
+from app.services import admin_service, dashboard_service, indicator_service
 
 router = APIRouter(prefix="/admin", tags=["管理平台"])
 
@@ -25,6 +26,16 @@ router = APIRouter(prefix="/admin", tags=["管理平台"])
 @router.get("/stats", response_model=ApiResponse[SystemOverview], summary="系统概览")
 def overview(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     return ok(admin_service.system_overview(db))
+
+
+@router.get("/dashboard", response_model=ApiResponse[AdminDashboardStats], summary="管理端业务看板")
+def dashboard(
+    days: int = Query(30, ge=1, le=90),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """评估记录、账号使用与动态评估接口调用统计，仅管理员可访问。"""
+    return ok(dashboard_service.admin_stats(db, days))
 
 
 # ---------- 用户管理 ----------

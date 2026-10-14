@@ -23,6 +23,33 @@ export interface AssessmentRecord {
   outcomeAt?: string
   completeness?: number
   veto?: string
+  contributions?: { code?: string; factor: string; category?: string; weight: number; score: number }[]
+  deductions?: { factor: string; score: number; reason: string }[]
+  overrides?: string[]
+  riskAlerts?: { code: string; factor: string; severity: 'veto' | 'high'; reason: string; score?: number | null }[]
+  engineUsage?: { expertCalls: number; dataLayerApplications: number }
+  transparency?: {
+    expectedCount: number
+    providedCount: number
+    scoredCount: number
+    missingCodes: string[]
+    confidence: number
+    confidenceLabel: string
+    confidenceExplanation: string
+    indicators: {
+      code: string
+      name: string
+      level: string
+      unit: string
+      value?: string | null
+      dataSource: string
+      riskMeaning: string
+      scoringRule: string
+      score?: number | null
+      weight?: number | null
+      status: 'provided' | 'missing' | 'invalid' | 'unscored'
+    }[]
+  }
   mixedBusiness?: Record<string, number>
   indicatorValues?: { code: string; name: string; level: string; unit: string; value: string | null; quality: string }[]
   input?: any
@@ -74,6 +101,46 @@ export interface SystemOverview {
 
 export function getSystemOverview(): Promise<SystemOverview> {
   return http.get('/admin/stats')
+}
+
+export interface AdminDashboardStats {
+  windowDays: number
+  assessmentTotal: number
+  averageScore: number
+  lowRiskCount: number
+  midRiskCount: number
+  highRiskCount: number
+  averageCompleteness: number | null
+  vetoCount: number
+  overrideCount: number
+  userBehavior: {
+    registeredAssessments: number
+    anonymousAssessments: number
+    activeUsers: number
+    topUsers: { userId: number; username: string; assessmentCount: number }[]
+  }
+  engineUsage: {
+    expertCalls: number
+    dataLayerApplications: number
+    trackedAssessments: number
+    untrackedAssessments: number
+    daily: { date: string; expertCalls: number; dataLayerApplications: number }[]
+  }
+  assessmentApiRequests: {
+    endpoint: string
+    metric: string
+    windowDays: number
+    total: number
+    succeeded: number
+    failed: number
+    unknown: number
+    daily: { date: string; count: number; succeeded: number; failed: number; unknown: number }[]
+  }
+  assessmentTrend: { date: string; count: number; avgScore: number }[]
+}
+
+export function getAdminDashboard(days = 30): Promise<AdminDashboardStats> {
+  return http.get('/admin/dashboard', { params: { days } })
 }
 
 export function listUsers(params: any): Promise<PageData<UserItem>> {
