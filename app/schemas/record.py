@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.schemas.risk import DataTransparency, EngineUsage, RiskAlert
+
 
 class IndicatorValueOut(BaseModel):
     """动态指标明细（评估记录详情）。"""
@@ -38,6 +40,12 @@ class AssessmentRecordOut(BaseModel):
     mixedBusiness: dict | None = None
     completeness: float | None = None
     veto: str | None = None
+    contributions: list[dict] | None = None
+    deductions: list[dict] | None = None
+    overrides: list[str] | None = None
+    riskAlerts: list[RiskAlert] | None = None
+    transparency: DataTransparency | None = None
+    engineUsage: EngineUsage | None = None
     indicatorValues: list[IndicatorValueOut] | None = None
 
     # 完整快照（详情查看）
@@ -47,7 +55,7 @@ class AssessmentRecordOut(BaseModel):
     @classmethod
     def from_model(cls, r, indicator_values: list[IndicatorValueOut] | None = None) -> "AssessmentRecordOut":
         input_json = r.input_json or {}
-        result_json = r.result_json or {}
+        result_json = r.result_json if isinstance(r.result_json, dict) else {}
         return cls(
             id=r.id,
             enterpriseName=r.enterprise_name,
@@ -65,6 +73,12 @@ class AssessmentRecordOut(BaseModel):
             mixedBusiness=input_json.get("mixedBusiness") if isinstance(input_json, dict) else None,
             completeness=result_json.get("completeness") if isinstance(result_json, dict) else None,
             veto=result_json.get("veto") if isinstance(result_json, dict) else None,
+            contributions=result_json.get("contributions"),
+            deductions=result_json.get("deductions"),
+            overrides=result_json.get("overrides"),
+            riskAlerts=result_json.get("riskAlerts"),
+            transparency=result_json.get("transparency"),
+            engineUsage=result_json.get("engineUsage"),
             indicatorValues=indicator_values,
             input=input_json,
             result=result_json,

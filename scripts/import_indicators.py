@@ -1,11 +1,12 @@
 """命令行：解析 docs 指标体系 xlsx → 写入 indicator_category + indicator_config。
 
 用法:
+    python scripts/migrate_202610_region_tags.py  # 既有库先执行幂等结构迁移
     python scripts/import_indicators.py
     python scripts/import_indicators.py --xlsx "path/to/xxx.xlsx"
     python scripts/import_indicators.py --check-only   # 仅解析并打印统计，不写库
 
-数据源: fore-end/docs/农业及相关产业动态指标搜集体系.xlsx（776 行 = 775 数据 + 表头，14 列）。
+数据源: race2-fore-end/docs/农业及相关产业动态指标搜集体系.xlsx（含区域标签列）。
 """
 
 import argparse
@@ -23,15 +24,18 @@ from app.models.indicator import IndicatorCategory, IndicatorConfig  # noqa: E40
 
 DEFAULT_XLSX = (
     Path(__file__).resolve().parent.parent.parent
-    / "fore-end"
+    / "race2-fore-end"
     / "docs"
     / "农业及相关产业动态指标搜集体系.xlsx"
 )
+LEGACY_XLSX = DEFAULT_XLSX.parents[2] / "fore-end" / "docs" / DEFAULT_XLSX.name
 
 HEADER_EXPECTED = [
     "层级", "所属类别", "指标名称", "指标类型", "单位", "取值说明", "数据来源",
-    "是否特色指标", "风险含义", "建议权重", "适用区域", "是否一票否决", "采集周期", "评分规则",
+    "是否特色指标", "风险含义", "建议权重", "适用范围", "是否一票否决", "采集周期", "评分规则", "区域标签",
 ]
+
+from app.services.indicator_regions import normalize_region, normalize_tag_values  # noqa: E402
 
 
 def parse_star(value: str) -> float:
@@ -141,7 +145,11 @@ def build(data: list[dict]) -> tuple[list[dict], list[dict]]:
         is_feature = str(r[7] or "").strip() == "是"
         risk_meaning = str(r[8] or "").strip()
         weight_star = parse_star(r[9])
-        region = str(r[10] or "").strip()
+        raw_region = str(r[10] or "").strip()
+        region, legacy_tags = normalize_region(raw_region, is_feature)
+        region_tags = normalize_tag_values(r[14] if len(r) > 14 and r[14] else legacy_tags)
+        if region == "示例：东北" and not region_tags:
+            region, region_tags = normalize_region("东北全境", True)
         is_veto = str(r[11] or "").strip() == "是"
         cycle = str(r[12] or "").strip()
         scoring_rule = str(r[13] or "").strip()
@@ -189,6 +197,7 @@ def build(data: list[dict]) -> tuple[list[dict], list[dict]]:
             "risk_meaning": risk_meaning,
             "weight_star": weight_star,
             "region": region,
+            "region_tags": region_tags,
             "is_veto": is_veto,
             "cycle": cycle,
             "scoring_rule": scoring_rule,
@@ -206,6 +215,8 @@ def main() -> None:
     args = ap.parse_args()
 
     xlsx_path = Path(args.xlsx)
+    if args.xlsx == str(DEFAULT_XLSX) and not xlsx_path.exists() and LEGACY_XLSX.exists():
+        xlsx_path = LEGACY_XLSX
     if not xlsx_path.exists():
         print(f"[err] 文件不存在: {xlsx_path}")
         sys.exit(1)
@@ -224,7 +235,8 @@ def main() -> None:
     print(f"  按层级: {dict(level_cnt)}")
     print(f"  特色指标: {feature_cnt}, 一票否决: {veto_cnt}")
     print(f"类别节点: {len(categories)} (大类 {sum(1 for c in categories if c['level']=='大类')} / "
-          f"中类 {sum(1 for c in categories if c['level']=='中类')} / 小类 {sum(1 for c in categories if c['level']=='小类')} / "
+          f"中类 {sum(1 for c in categories if c['level']=='中类')} / "
+          f"小类 {sum(1 for c in categories if c['level']=='小类')} / "
           f"具体营业类型 {sum(1 for c in categories if c['level']=='具体营业类型')})")
 
     # 校验唯一性

@@ -39,26 +39,29 @@ def _mask_sensitive(text: str) -> str:
 class RequestLogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         start = time.perf_counter()
+        path = request.url.path
+        # 在下游消费请求流之前读取并缓存，BaseHTTPMiddleware 会重放缓存的 body。
+        # 下游处理后再 request.body() 会触发 Stream consumed，导致整个 POST 日志丢失。
+        req_body = None
+        if (
+            path.startswith("/api/")
+            and path not in _SENSITIVE_PATHS
+            and request.method in ("POST", "PUT", "DELETE")
+            and request.headers.get("content-type", "").startswith("application/json")
+        ):
+            try:
+                raw = await request.body()
+                req_body = _mask_sensitive(raw.decode("utf-8", errors="replace")[:_BODY_LIMIT])
+            except Exception:  # noqa: BLE001
+                pass
         response = await call_next(request)
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
 
-        path = request.url.path
         # 仅记录业务 API
         if not path.startswith("/api/"):
             return response
 
         try:
-            # 请求体（仅 JSON，截断；敏感路径不记录）
-            req_body = None
-            if request.method in ("POST", "PUT", "DELETE") and request.headers.get("content-type", "").startswith(
-                "application/json"
-            ):
-                raw = await request.body()
-                if path in _SENSITIVE_PATHS:
-                    req_body = None
-                else:
-                    req_body = _mask_sensitive(raw.decode("utf-8", errors="replace")[:_BODY_LIMIT])
-
             # 响应预览（JSONResponse 可读 body；脱敏 token；gzip 压缩响应先解压）
             resp_preview = None
             try:

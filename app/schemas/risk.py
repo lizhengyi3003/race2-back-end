@@ -1,8 +1,9 @@
 """风险评估请求/响应 —— 严格对齐前端 fore-end/src/api/types.ts 契约"""
 
 import re
+from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 # 经营类型大类编码：01~10 或 MIXED（混合经营）
 _BUSINESS_TYPE_RE = re.compile(r"^(0[1-9]|10|MIXED)$")
@@ -85,6 +86,7 @@ class FactorContribution(BaseModel):
     category: str
     weight: float
     score: float  # 单项得分 0-100
+    code: str = ""  # 稳定指标编码，供详情定位
 
 
 class Deduction(BaseModel):
@@ -93,6 +95,45 @@ class Deduction(BaseModel):
     factor: str
     score: float
     reason: str
+    code: str = ""
+
+
+class RiskAlert(BaseModel):
+    code: str = ""  # 空编码表示整体评估风险
+    factor: str
+    severity: Literal["veto", "high"]
+    reason: str
+    score: float | None = None
+
+
+class IndicatorExplanation(BaseModel):
+    code: str
+    name: str
+    level: str
+    unit: str
+    value: str | None = None
+    dataSource: str
+    riskMeaning: str
+    scoringRule: str
+    score: float | None = None
+    weight: float | None = None
+    status: Literal["provided", "missing", "invalid", "unscored"]
+
+
+class DataTransparency(BaseModel):
+    expectedCount: int
+    providedCount: int
+    scoredCount: int
+    missingCodes: list[str]
+    confidence: float  # 可评估指标有效覆盖率；不是预测准确率
+    confidenceLabel: str
+    confidenceExplanation: str
+    indicators: list[IndicatorExplanation]
+
+
+class EngineUsage(BaseModel):
+    expertCalls: int
+    dataLayerApplications: int  # 已成功参与结果融合的次数
 
 
 class RiskResult(BaseModel):
@@ -109,3 +150,6 @@ class RiskResult(BaseModel):
     overrides: list[str] = []  # 触发的兜底规则（极端场景人工复核提示）
     veto: str | None = None  # 一票否决命中指标名（专家引擎）
     completeness: float = 0.0  # 数据完整度 0~1（相对期望指标集）
+    riskAlerts: list[RiskAlert] = Field(default_factory=list)
+    transparency: DataTransparency | None = None  # 老记录可能没有解释快照
+    engineUsage: EngineUsage | None = None  # 老记录不推断执行次数
