@@ -164,8 +164,7 @@ def run_experiments(df: pd.DataFrame, target: str = "default", seed: int = 42) -
     # ---------- 实验三：涉农专属模型 vs 通用风控模型 ----------
     exp3 = {
         "name": "实验三：涉农专属模型 vs 通用风控模型",
-        "desc": "通用风控模型仅使用传统信用指标（户主特征/财报/征信近似），"
-        "涉农专属模型使用东北涉农场景六大类替代数据指标",
+        "desc": "通用风控模型仅使用传统信用指标（户主特征/财报/征信近似），涉农专属模型使用涉农场景六大类替代数据指标",
         "groups": {
             "通用风控模型（传统指标）": _train_eval(_woe_matrix(df, TRADITIONAL_FIELDS, binners).values, y, seed),
             "涉农专属模型（替代数据评分卡）": _train_eval(_woe_matrix(df, ALTERNATIVE_FIELDS, binners).values, y, seed),

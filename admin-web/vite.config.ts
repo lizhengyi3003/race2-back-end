@@ -13,10 +13,12 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    port: 5173,
+    // ⚠️ 与旧项目 race 的 5173 隔离，本环境（race3）改用 5176
+    port: 5176,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        // race3 Docker 后端主机端口为 18001（8001 被 Windows 系统保留无法绑定）
+        target: process.env.VITE_DEV_PROXY || 'http://localhost:18001',
         changeOrigin: true,
       },
     },

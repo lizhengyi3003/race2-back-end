@@ -6,4 +6,6 @@ httpx>=0.27.0
 
 # 指标体系文档解析（import_indicators.py，仅开发/运维用）
 openpyxl>=3.1.0
+# 论文架构图与流程图（scripts/gen_chapter3_diagrams.py）
+matplotlib>=3.9.0
 ruff>=0.16.0

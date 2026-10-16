@@ -7,10 +7,13 @@ venv/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 
 # ===== 数据与模型（保留目录结构）=====
 data/*.db
 data/*.db-journal
+data/*.sql
+data/*.sql-journal
 data/models/*
 !data/models/.gitkeep
 data/samples/*

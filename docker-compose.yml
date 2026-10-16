@@ -1,7 +1,8 @@
+# race3（大创）独立环境：容器名 / 主机端口 / 数据卷均与旧项目 race 隔离，两套可并行运行
 services:
   mysql:
     image: mysql:8.0
-    container_name: race-mysql
+    container_name: race3-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: race123456
@@ -9,7 +10,8 @@ services:
       TZ: Asia/Shanghai
     ports:
       # 仅绑定本机回环地址，避免 MySQL 端口暴露到公网（backend 容器走 Docker 内网访问 mysql:3306）
-      - "127.0.0.1:3306:3306"
+      # ⚠️ 主机 3306 已被旧项目 race 占用，本环境改用 3307
+      - "127.0.0.1:3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -21,7 +23,7 @@ services:
 
   backend:
     build: .
-    container_name: race-backend
+    container_name: race3-backend
     restart: unless-stopped
     depends_on:
       mysql:
@@ -40,7 +42,9 @@ services:
       # 行为验证码服务（compose 内网服务名）
       CAPTCHA_SERVICE_URL: ${CAPTCHA_SERVICE_URL:-http://go-captcha-service:8080}
     ports:
-      - "8000:8000"
+      # ⚠️ 与旧项目 race 的 8000 端口隔离
+      # 注意：8001 会被 Windows 系统保留导致绑定失败（权限错误），故改用 18001
+      - "18001:8000"
     volumes:
       - model_data:/app/data/models
       - sample_data:/app/data/samples
@@ -50,14 +54,21 @@ services:
   # 参数必失败），服务本身功能正常 → 显式禁用健康检查，容器显示 running 而非 unhealthy
   go-captcha-service:
     image: wenlng/go-captcha-service:1.0.5
-    container_name: race-gocaptcha
+    container_name: race3-gocaptcha
     restart: unless-stopped
     healthcheck:
       disable: true
     ports:
-      - "127.0.0.1:9090:8080"
+      # ⚠️ 与旧项目 race 的 9090 端口隔离
+      # 注意：9091 落在 Windows 保留端口段（9082-9181）无法绑定，故改用 19091
+      # 后端容器走内网 http://go-captcha-service:8080 访问，此映射仅本机调试用
+      - "127.0.0.1:19091:8080"
 
+# 数据卷显式命名：与旧项目 race 的 back-end_* 前缀卷完全隔离，互不覆盖
 volumes:
   mysql_data:
+    name: race3_mysql_data
   model_data:
+    name: race3_model_data
   sample_data:
+    name: race3_sample_data

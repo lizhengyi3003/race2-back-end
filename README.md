@@ -1,6 +1,6 @@
 # 涉农信贷风险智能评估系统 · 后端管理平台
 
-> 挑战杯创业计划竞赛（东北振兴产业升级专项赛）· 数智赋能产业组
+> "挑战杯"全国大学生课外学术科技作品竞赛
 > 基于多元统计模型的涉农小微企业信贷风险智能评估系统
 
 本仓库为项目**后端 + 完整可视化后台管理平台**，包含：
@@ -30,8 +30,10 @@ back-end/
 ├── admin-web/              # 后台管理平台前端（Vue3 + Element Plus + ECharts）
 ├── scripts/                # init_db / import_indicators / seed_* / train_* / 迁移脚本
 ├── data/                   # 模型文件、合成样本
-│   └── 数据集/             # 竞赛研究数据集（CFPS/CHFS/CMES，Git LFS 托管）
-├── tests/                  # pytest 测试（25 项）
+│   └── 数据集/             # CFPS/CHFS/CMES，本地存储、Cloudflare R2 备份，不纳入 Git
+├── tests/                  # pytest：认证、动态评估、区域元数据、解释契约与管理监控
+├── docs/                   # 管理看板等接口契约
+├── docs_archive_20260920/   # 14 列指标体系及全国化中间版本（仅供历史追溯）
 ├── Dockerfile              # 多阶段构建（前端 + 后端）
 └── docker-compose.yml      # backend + MySQL 一键启动
 ```
@@ -51,14 +53,16 @@ back-end/
 
 ```bash
 cd back-end
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+docker compose up -d --build
 ```
 
-- 端口：后端 `8000`；MySQL 容器映射宿主 `3307`（本机 3306 可能被本机 MySQL 占用，故用 3307；backend 容器内部仍走 `mysql:3306`，逻辑与服务器一致）
-- 数据：MySQL 数据、模型文件、样本文件分别持久化在命名卷 `back-end_mysql_data / back-end_model_data / back-end_sample_data`
+- race3 本地端口：后端 `18001` → 容器 `8000`；MySQL `127.0.0.1:3307` → 容器 `3306`；验证码 `127.0.0.1:19091` → 容器 `8080`。
+- 容器：`race3-backend`、`race3-mysql`、`race3-gocaptcha`；MySQL、模型、样本分别持久化在 `race3_mysql_data / race3_model_data / race3_sample_data`，与旧项目隔离。
 - 首次启动前若需迁移本机 MySQL 数据：`mysqldump --databases race > race_dump.sql` 后 `docker exec -i race-mysql mysql -uroot -prace123456 < race_dump.sql`，并将 `data/models/*.pkl`、`data/samples/synthetic_samples.csv` 拷入对应卷（避免启动时自动训练覆盖）
-- 停止：`docker compose -f docker-compose.yml -f docker-compose.local.yml down`
-- 使用本机 `.venv` 直连方式时，需把 `.env` 的 `DATABASE_URL` 改回 `localhost:3306`
+- 停止：`docker compose down`
+- 使用本机 `.venv` 连接上述 Docker MySQL 时，`DATABASE_URL` 使用 `127.0.0.1:3307`；容器内后端使用 `mysql:3306`。
+
+已有数据库升级到区域标签版本时，先备份数据库，再使用对应环境执行 `python scripts/migrate_202610_region_tags.py`。当前指标源为同级前台 `fore-end/docs/` 中的 3023 条 × 15 列版本；迁移只补充表结构，不自动替换指标。导入器默认会清空重建指标配置，应先保留人工维护的评分参数；仅检查源文件可执行 `python scripts/import_indicators.py --check-only`。
 
 ### 2. 后端启动
 
@@ -79,23 +83,23 @@ python scripts/seed_data.py
 python scripts/train_model.py
 
 # 启动服务（启动时若无模型会自动训练）
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 18001 --reload
 ```
 
 启动后访问：
 
 | 地址 | 说明 |
 |---|---|
-| http://localhost:8000/admin | 后台管理平台（需先 `npm run build` 构建 admin-web） |
-| http://localhost:8000/docs | Swagger 接口文档 |
-| http://localhost:8000/ | 服务信息 |
+| http://localhost:18001/admin | 后台管理平台（需先 `npm run build` 构建 admin-web） |
+| http://localhost:18001/docs | Swagger 接口文档（开发环境） |
+| http://localhost:18001/ | 服务信息 |
 
 ### 3. 管理前端（开发模式）
 
 ```bash
 cd back-end/admin-web
 npm install
-npm run dev          # http://localhost:5173（已代理 /api → localhost:8000）
+npm run dev          # http://localhost:5176（已代理 /api → localhost:18001）
 ```
 
 生产构建（FastAPI 自动挂载到 `/admin`）：
@@ -110,7 +114,7 @@ npm run build        # 产物在 admin-web/dist，重启后端即可访问 /admi
 ```bash
 cd ../fore-end
 npm install
-npm run dev          # http://localhost:5174（已代理 /api → localhost:8000）
+npm run dev          # http://localhost:5175（已代理 /api → localhost:18001）
 ```
 
 > 🔐 **邀约制登录**：本系统不开放注册，账号由后台管理平台（admin-web「用户管理」）统一开通。默认管理员 `admin/admin123` 登录管理端后，可在「数据管理 → 用户管理」创建分析师账号，再用于竞赛前端登录。登录态保存在浏览器 `localStorage`，刷新页面自动恢复。
@@ -138,7 +142,7 @@ DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/race?charset=utf8m
 
 ```
 线上评估（生产主路径）：
-  动态指标体系（基本项 + 大类→中类→小类→具体营业类型，700+ 指标按经营自动加载）
+  动态指标体系（基本项 + 大类→中类→小类→具体营业类型，源文件 3023 条指标按经营加载）
     → 逐指标评分（数值分箱 / 枚举档位 / 布尔映射）
     → 层级基础权重 + 星级归一 + 特色/区域加成
     → 加权合成 0-1000 分，业务阈值分级：≥700 低风险 / 500-700 中等 / <500 高风险
@@ -185,11 +189,16 @@ DATABASE_URL=mysql+pymysql://root:你的密码@localhost:3306/race?charset=utf8m
 | 评估记录 | `GET /risk/records` `GET/DELETE /risk/records/{id}` | 记录管理 | 需登录 |
 | 数据看板 | `GET /dashboard/stats` `/industry-distribution` `/score-distribution` `/trend` | 统计 | 公开 |
 | 指标体系 | `GET /indicators/tree` | 指标树（基本项 + 大类→中类→小类） | 需登录 |
+| 管理看板 | `GET /admin/dashboard` | 评估解释、账号行为、真实引擎调用与 API 请求统计 | 管理员 |
 | 模型管理 | `GET /model/info` `POST /model/train` `GET /model/versions` `GET /model/metrics` `GET /model/thresholds` `GET /model/monitor` | 信息/训练/版本/监控/阈值 | 需登录 |
 | 管理平台 | `GET /admin/stats` `/users` `/api-logs` `/api-spec` `/configs` | 系统管理 | 需登录 |
 | 系统监控 | `GET /monitor/server` `/database` `/health` | 服务器/数据库/健康 | 需登录 |
 
 统一响应格式：`{ "code": 200, "message": "success", "data": ... }`（前端以 `code` 判断成败）。
+
+区域标签、评估解释及管理看板契约见 `docs/admin-dashboard-contract.md`。即时评估与历史记录保留 `riskAlerts`、`transparency` 和 `engineUsage` 快照；覆盖率衡量数据充分程度，旧记录未跟踪的引擎调用次数不作推测。
+
+新增资料与运维工具索引见 `scripts/README.md`；14 列旧版的扫描、改造和核验记录仅供历史追溯，不能替代当前区域配置流程。
 
 ---
 
@@ -200,7 +209,7 @@ cd back-end
 .venv\Scripts\python.exe -m pytest tests -v
 ```
 
-覆盖：认证、动态评估契约（专家引擎）、模型训练指标、监控与管理接口（25 项用例）。
+覆盖：认证与验证码、动态评估、区域元数据、风险提示与数据解释、模型训练、监控和管理接口。测试使用独立的 `race_test` 数据库（`127.0.0.1:3307`），每次运行会重建该测试库；业务库 `race` 不参与测试初始化。
 
 ---
 
