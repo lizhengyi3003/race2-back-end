@@ -3,7 +3,7 @@ FROM node:22-alpine AS admin-build
 WORKDIR /admin
 COPY admin-web/package*.json ./
 # 国内服务器访问 npmjs 慢，用 npmmirror 加速
-RUN npm config set registry https://registry.npmmirror.com && npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 COPY admin-web/ ./
 RUN npm run build
 
@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 # 后端代码
 COPY app ./app
 COPY scripts ./scripts
+COPY deploy/indicators.xlsx ./deploy/indicators.xlsx
 
 # 管理前端构建产物（FastAPI 自动挂载到 /admin）
 COPY --from=admin-build /admin/dist ./admin-web/dist

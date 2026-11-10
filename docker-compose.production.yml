@@ -1,0 +1,64 @@
+name: race3-production
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
+      MYSQL_DATABASE: race3
+      MYSQL_USER: race3
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$${MYSQL_PASSWORD}" mysqladmin ping -h localhost -u race3 --silent']
+      interval: 5s
+      timeout: 5s
+      retries: 40
+    logging: &logging
+      driver: json-file
+      options: { max-size: 10m, max-file: '3' }
+  go-captcha-service:
+    image: wenlng/go-captcha-service:1.0.5
+    restart: unless-stopped
+    healthcheck: { disable: true }
+    logging: *logging
+  backend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mysql: { condition: service_healthy }
+      go-captcha-service: { condition: service_started }
+    environment:
+      ENV: production
+      DATABASE_URL: mysql+pymysql://race3:${MYSQL_PASSWORD:?}@mysql:3306/race3?charset=utf8mb4
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY}
+      DEFAULT_ADMIN_USERNAME: ${DEFAULT_ADMIN_USERNAME:-admin}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:?}
+      CORS_ORIGINS: https://intellicoretech.cn,https://race-fore-end.feichuan613.workers.dev
+      AUTO_TRAIN_ON_STARTUP: 'false'
+      CAPTCHA_ENABLED: 'true'
+      CAPTCHA_SERVICE_URL: http://go-captcha-service:8080
+      AI_REVIEW_ENABLED: ${AI_REVIEW_ENABLED:-false}
+      AI_REVIEW_NAMESPACE: race3-production
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-}
+    ports:
+      - 127.0.0.1:8000:8000
+    volumes:
+      - model_data:/app/data/models
+      - sample_data:/app/data/samples
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5)"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 45s
+    logging: *logging
+volumes:
+  mysql_data:
+  model_data:
+  sample_data:

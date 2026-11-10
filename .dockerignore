@@ -7,6 +7,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .env
+.env.*
+data.zip
+data/*.sql
 
 # ===== 大数据（不进入镜像/构建上下文）=====
 data/数据集/
