@@ -4,7 +4,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 
 from app.core.config import settings
 
@@ -37,5 +38,5 @@ def decode_token(token: str) -> dict[str, Any] | None:
     """解析 JWT，失败返回 None"""
     try:
         return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-    except JWTError:
+    except InvalidTokenError:
         return None

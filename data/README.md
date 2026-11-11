@@ -14,7 +14,7 @@
 | `*.sql`、`*.db` | 本地数据库备份或历史文件 | 忽略 |
 | `nationalize_*.csv` | 旧版 14 列指标全国化扫描、变更与核验快照 | 随仓库保留 |
 | `enum_map_candidates.csv` | 枚举打分候选配置，应用前需人工审核 | 随仓库保留 |
-| `requirements-venv-snapshot.txt` | 历史环境依赖快照 | 随仓库保留；安装使用仓库根 requirements 文件 |
+| `venv-snapshot.md` | 历史环境依赖快照 | 随仓库保留；安装使用仓库根 requirements 文件 |
 
 当前管道见 [scripts/fusion/README.md](../scripts/fusion/README.md)；[scripts/DATA_PIPELINE.md](../scripts/DATA_PIPELINE.md) 为旧版双源代理流程。清洗脚本重复使用同一版本会覆盖同名文件并追加版本记录，保留旧结果时应使用新的版本号。
 
