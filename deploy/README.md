@@ -7,6 +7,8 @@ Secrets live in `/etc/race3/production.env` (root, mode 600), never in GitHub so
 The stack contains FastAPI plus the admin UI, MySQL 8 and go-captcha-service.
 Only `127.0.0.1:8000` is published. Cloudflare Tunnel forwards
 `backend.intellicoretech.cn` to that listener; the frontend Worker forwards `/api/*` and `/admin/*`.
+Production ingress is managed in Cloudflare. The bundled `cloudflared-config.yml` shows
+the equivalent local ingress rules.
 `/healthz` checks database connectivity; `/docs`, `/redoc` and `/openapi.json` are disabled in production.
 
 Initial provisioning runs `scripts/bootstrap_production.py` against the new database.
