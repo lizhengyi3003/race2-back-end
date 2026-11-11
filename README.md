@@ -1,6 +1,6 @@
 # 涉农信贷风险智能评估系统 · 后端管理平台
 
-> 2026-11-10 生产部署：使用 race2-back-end 仓库、`/srv/race3/backend` 目录和独立 `docker-compose.production.yml`。生产配置、首次初始化和自动部署见 [deploy/README.md](deploy/README.md)。以下默认 Compose 和端口说明用于本地开发，不能代替生产配置。
+> 生产环境的 Compose、首次初始化和自动发布见 [生产部署手册](deploy/README.md)。
 
 > 基于多元统计模型的涉农小微企业信贷风险智能评估系统
 
@@ -317,59 +317,36 @@ AI 复核的专项测试与验收产物保留在本地，不随代码提交；�
 
 ## 部署
 
-### 1. 用户前端（fore-end）→ Cloudflare Workers 静态资源
+### 1. 生产环境
 
-1. 在 `fore-end` 执行 `npm install`、`npm run build`，生成 `dist/`。
-2. 仓库 `wrangler.jsonc` 定义静态资源 Worker `race-fore-end`，资源目录为 `dist`；按 Cloudflare 的项目绑定配置部署构建产物。前端使用 Hash 路由。
-3. `src/api/index.ts` 默认将自定义域名指向 `https://api.intellicoretech.cn/api/v1`，将 `*.workers.dev` 预览指向 `https://api.intellicoretech.cn/dev/api/v1`。需要覆盖时，在构建前设置 `VITE_API_BASE_URL`。
+阿里云服务器使用 `docker-compose.production.yml`，运行 FastAPI、管理端、MySQL 和验证码服务。Cloudflare Tunnel 将 `backend.intellicoretech.cn` 转发到服务器的 `127.0.0.1:8000`。
 
-前端部署与 API 网关配置详见同级前台 [README](../fore-end/README.md)；网关源码存档在 `fore-end/cloudflare/intellicore-worker/`。
+| 服务 | 公开入口 |
+| --- | --- |
+| 用户端 | [intellicoretech.cn](https://intellicoretech.cn/) |
+| 管理端 | [intellicoretech.cn/admin/](https://intellicoretech.cn/admin/) |
+| API | 同域 `/api/v1`，也可使用 `https://api.intellicoretech.cn/api/v1` |
 
-### 2. 后端 + 管理端 → 服务器 Docker
+前端静态资源与网关由 `race-fore-end` Worker 托管，配置见 [前端部署手册](https://github.com/lizhengyi3003/race2-fore-end/blob/main/cloudflare/DEPLOYMENT.md)。
+
+### 2. 本地 Docker
 
 ```bash
-cd back-end
 docker compose up -d --build
 ```
 
 - `mysql` 服务：MySQL 8.0，数据卷持久化
 - `backend` 服务：多阶段构建（前端构建 + 后端），自动挂载管理端到 `/admin/`；启动初始化和自动训练条件见上文
 - `go-captcha-service` 服务：登录行为验证码，后端通过 Docker 内网访问
-- 当前仓库 Compose 发布端口为 `18001`，访问 `http://<服务器IP>:18001/admin/`；容器内部端口为 `8000`。服务器如使用覆盖配置，按实际发布端口设置反向代理或隧道
-
-服务器部署步骤：
-
-1. 修改 `.env`：容器连接使用 `mysql:3306`（或容器可达的外部 MySQL），`JWT_SECRET_KEY` 换随机串、`CORS_ORIGINS` 填入前端域名；生产设置 `ENV=production` 关闭 `/docs` 与 `/redoc`
-2. `docker compose up -d --build`
-3. （可选）配置 Nginx/Caddy 反代 HTTPS，并将域名解析到服务器
+- 本地 Compose 将容器的 `8000` 发布到主机的 `18001`，管理端地址为 `http://localhost:18001/admin/`。
 
 Compose 只向容器注入 `backend.environment` 中声明的变量，其他 `.env` 字段不会自动传入。例如更改首次创建的管理员账号/密码，需显式添加 `DEFAULT_ADMIN_USERNAME`、`DEFAULT_ADMIN_PASSWORD` 到该服务的环境配置；已有账号密码通过管理端重置，修改初始化变量不会覆盖已有账号。
 
-**仓库约定的部署域名**：
-
-| 服务                 | 地址                                                                                    |
-| -------------------- | --------------------------------------------------------------------------------------- |
-| 竞赛前端（fore-end） | https://intellicoretech.cn （Cloudflare Workers 静态资源，Hash 路由）                   |
-| 后端 API             | https://api.intellicoretech.cn （Cloudflare Worker 网关 → 隧道 → 部署环境的后端端口） |
-| 管理平台             | https://backend.intellicoretech.cn/admin                                                |
-
 ### 3. CI/CD 自动部署（GitHub Actions）
 
-推送到 `main` 或 `dev` 且命中路径过滤时触发服务器部署，也可通过 `workflow_dispatch` 手动选择分支：
+`main` 的推送通过 `Backend CI` 后，`Deploy production` 用受限 SSH 密钥发布已验证的提交。生产部署脚本等待服务通过内部健康检查，随后 Actions 检查公网 Tunnel 和 Worker API。
 
-```mermaid
-graph LR
-  A[本地 git push] --> B[GitHub Actions: Deploy to Server]
-  B --> C[SSH 受限密钥连服务器]
-  C --> D[deploy-backend.sh main 或 dev]
-  D --> E[服务器脚本执行对应分支部署]
-```
-
-- 触发范围：`app/**`、`scripts/**`、`admin-web/**`、`Dockerfile`、`docker-compose.yml`、`requirements*.txt`、workflow 文件
-- workflow 调用 `deploy-backend.sh ${{ github.ref_name }}`；仓库注释约定服务器脚本为 `/root/deploy-backend.sh`，通过受限部署密钥接收 `main/dev` 分支参数。服务器脚本及密钥限制需在服务器单独配置
-- GitHub Secrets：`SERVER_HOST` / `SERVER_USER` / `DEPLOY_SSH_KEY`（Settings → Secrets and variables → Actions）
-- 根 `README.md` 不在触发范围内，但 `scripts/README.md` 等匹配 `scripts/**` 的文档仍会触发；不能按扩展名判断是否部署
-- 当前 Compose 将模型/样本保存在持久卷中；自动训练还取决于是否存在可加载的激活模型，恢复时需保证数据库版本记录与模型产物对应
+发布环境变量、密钥和代码回滚步骤见 [生产部署手册](deploy/README.md)。
 
 ### 4. 本地自动部署（git post-commit hook）
 
