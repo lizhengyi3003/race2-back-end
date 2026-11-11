@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 使用问答与想法
+    url: https://github.com/lizhengyi3003/race2-back-end/discussions
+    about: 在 Discussions 提问或交流尚未形成具体任务的想法。
+  - name: 私密报告安全漏洞
+    url: https://github.com/lizhengyi3003/race2-back-end/security/advisories/new
+    about: 通过私密漏洞报告提交细节。
