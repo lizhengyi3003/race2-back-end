@@ -432,3 +432,9 @@ npm run build       # vue-tsc + vite 构建验证
 | 分析师 | `analyst1` | `analyst123`（示例，由管理员在管理端创建） |
 
 > 生产部署前配置随机 `JWT_SECRET_KEY`，并在管理端修改默认管理员密码。首次创建账号可使用 `DEFAULT_ADMIN_*`；本机 Python 从 `.env` 读取，Docker 需按部署一节显式传入。
+
+## 许可证与源码
+
+本仓库的项目自有代码按 [GNU Affero General Public License v3.0 only](LICENSE) 发布（`AGPL-3.0-only`）。第三方依赖和资料沿用各自的许可条款。
+
+对应源码、构建配置和部署说明见 [GitHub 仓库](https://github.com/lizhengyi3003/race2-back-end)。

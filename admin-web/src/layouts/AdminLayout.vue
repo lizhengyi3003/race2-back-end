@@ -162,6 +162,7 @@ const menus = [
           <span class="page-title">{{ route.meta.title }}</span>
         </div>
         <div class="header-right">
+          <a href="https://github.com/lizhengyi3003/race2-back-end">源代码</a>
           <el-tag v-if="!isMobile" size="small" type="success" effect="plain" class="env-tag">本地环境</el-tag>
           <el-dropdown>
             <span class="user-info">

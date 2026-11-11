@@ -164,7 +164,9 @@ function handleLogin() {
           登 录
         </el-button>
       </el-form>
-      <div class="tip">默认账号 admin / admin123</div>
+      <div class="tip">
+        默认账号 admin / admin123 · <a href="https://github.com/lizhengyi3003/race2-back-end">源代码</a>
+      </div>
     </div>
 
     <!-- 行为验证码弹窗：点击登录后弹出，校验通过才继续登录 -->
