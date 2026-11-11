@@ -13,10 +13,10 @@ from pathlib import Path
 import pymysql
 
 # 必须在导入 app 模块前：创建独立测试库并设置环境变量
-_MYSQL_HOST = "127.0.0.1"
-_MYSQL_PORT = 3307
-_MYSQL_USER = "root"
-_MYSQL_PASS = "race123456"
+_MYSQL_HOST = os.environ.get("TEST_MYSQL_HOST", "127.0.0.1")
+_MYSQL_PORT = int(os.environ.get("TEST_MYSQL_PORT", "3307"))
+_MYSQL_USER = os.environ.get("TEST_MYSQL_USER", "root")
+_MYSQL_PASS = os.environ.get("TEST_MYSQL_PASS", "race123456")
 _TEST_DB = "race_test"
 
 try:
@@ -41,6 +41,9 @@ os.environ["DATABASE_URL"] = (
     f"mysql+pymysql://{_MYSQL_USER}:{_MYSQL_PASS}@{_MYSQL_HOST}:{_MYSQL_PORT}/{_TEST_DB}?charset=utf8mb4"
 )
 os.environ["AUTO_TRAIN_ON_STARTUP"] = "false"
+os.environ["ENV"] = "development"
+os.environ["DEFAULT_ADMIN_USERNAME"] = "admin"
+os.environ["DEFAULT_ADMIN_PASSWORD"] = "admin123"
 os.environ["MODEL_DIR"] = f"{_tmpdir}/models"
 os.environ["SAMPLE_DIR"] = f"{_tmpdir}/samples"
 # 测试环境跳过行为验证码（登录等接口不被验证码阻断）

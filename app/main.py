@@ -10,7 +10,9 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.v1.router import api_router
@@ -73,6 +75,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         docs_url=None if is_prod else "/docs",
         redoc_url=None if is_prod else "/redoc",
+        openapi_url=None if is_prod else "/openapi.json",
     )
 
     # ---------- CORS ----------
@@ -102,6 +105,15 @@ def create_app() -> FastAPI:
 
     # ---------- 路由 ----------
     app.include_router(api_router, prefix=settings.API_PREFIX)
+
+    @app.get("/healthz", include_in_schema=False)
+    def healthz():
+        try:
+            with SessionLocal() as db:
+                db.execute(text("SELECT 1"))
+            return {"status": "ok"}
+        except Exception:
+            return JSONResponse({"status": "unavailable"}, status_code=503)
 
     # ---------- 管理端静态资源（生产构建后自动挂载）----------
     admin_dist = Path(__file__).resolve().parent.parent / "admin-web" / "dist"

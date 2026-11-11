@@ -1,6 +1,7 @@
 # 涉农信贷风险智能评估系统 · 后端管理平台
 
-> "挑战杯"全国大学生课外学术科技作品竞赛
+> 2026-11-10 生产部署：使用 race2-back-end 仓库、`/srv/race3/backend` 目录和独立 `docker-compose.production.yml`。生产配置、首次初始化和自动部署见 [deploy/README.md](deploy/README.md)。以下默认 Compose 和端口说明用于本地开发，不能代替生产配置。
+
 > 基于多元统计模型的涉农小微企业信贷风险智能评估系统
 
 文档核对日期：2026-10-17。启动、接口权限与部署说明按当前仓库代码及配置整理。
@@ -11,7 +12,7 @@
 - **数据层评分卡**：IV 特征筛选 → WOE 编码 → VIF 共线性诊断 → Logistic 回归 → 0-1000 分评分卡；已注册数据层模型且输入特征充分时，可参与线上专家引擎的混合调整
 - **后端 API 服务**：FastAPI + SQLAlchemy 2.x + MySQL 8.0
 - **后台管理平台**（`admin-web/`，Vue3 + Element Plus）：登录、系统概览、数据管理、模型训练与评估、API 管理（列表/日志/测试控制台）、系统监控（服务器/数据库/健康检查）
-- **竞赛前端对接**：`fore-end/`（同级目录）已从模拟模型切换为调用本后端真实 API
+- **前端对接**：`fore-end/`（同级目录）已从模拟模型切换为调用本后端真实 API
 
 ---
 
@@ -120,11 +121,11 @@ FastAPI、scikit-learn 与 imbalanced-learn 限制在已验证的次版本范围
 
 启动后访问：
 
-| 地址 | 说明 |
-|---|---|
+| 地址                          | 说明                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------- |
 | http://localhost:18001/admin/ | 后台管理平台（Docker 自动构建；本机 Python 需先构建 admin-web，再重启后端） |
-| http://localhost:18001/docs | Swagger 接口文档（开发环境） |
-| http://localhost:18001/ | 服务信息 |
+| http://localhost:18001/docs   | Swagger 接口文档（开发环境）                                                |
+| http://localhost:18001/       | 服务信息                                                                    |
 
 ### 4. 管理前端（开发模式）
 
@@ -159,11 +160,11 @@ npm run dev          # http://localhost:5175（已代理 /api → localhost:1800
 
 数据库连接地址取决于后端运行位置：
 
-| 后端运行位置 | MySQL 主机与端口 | 验证码服务地址 |
-| --- | --- | --- |
-| 当前 Compose 的 backend 容器 | `mysql:3306` | `http://go-captcha-service:8080` |
-| 本机 Python，连接当前 Compose 服务 | `127.0.0.1:3307` | `http://127.0.0.1:19091` |
-| 本机 Python，连接自行安装的服务 | 按实际配置，例如 `127.0.0.1:3306` | 按实际验证码服务配置 |
+| 后端运行位置                       | MySQL 主机与端口                    | 验证码服务地址                     |
+| ---------------------------------- | ----------------------------------- | ---------------------------------- |
+| 当前 Compose 的 backend 容器       | `mysql:3306`                      | `http://go-captcha-service:8080` |
+| 本机 Python，连接当前 Compose 服务 | `127.0.0.1:3307`                  | `http://127.0.0.1:19091`         |
+| 本机 Python，连接自行安装的服务    | 按实际配置，例如 `127.0.0.1:3306` | 按实际验证码服务配置               |
 
 完整连接串格式为 `mysql+pymysql://用户名:密码@主机:端口/race?charset=utf8mb4`。Compose 首次初始化会创建 `race` 数据库；自行安装 MySQL 时先执行 `CREATE DATABASE race DEFAULT CHARACTER SET utf8mb4;`，再运行 `python scripts/init_db.py`。已有数据卷使用创建时的数据库凭证，修改 Compose 中的密码变量不会自动修改库内密码。
 
@@ -193,6 +194,7 @@ npm run dev          # http://localhost:5175（已代理 /api → localhost:1800
 模型验证：AUC / KS / 混淆矩阵 / 召回率 / 5 折交叉验证 / PSI，训练指标在管理平台可视化展示（ROC 曲线、KS 曲线、IV 条形图、混淆矩阵热力图）。
 
 小样本与极端场景应对（对齐商业计划书 3.3.1）：
+
 - **SMOTE 过采样**：对违约样本合成扩增（仅训练集，避免数据泄漏），缓解违约率 3%-5% 的样本不平衡
 - **一票否决红线**：失信被执行人、重大税收违法、连三累六等红线指标，命中时给出高风险/拒贷建议并提示人工复核
 - **模型监控**：PSI 群体稳定性监控（训练分布 vs 实际客群），样本不足或显著偏移时触发再校准预警
@@ -208,34 +210,34 @@ npm run dev          # http://localhost:5175（已代理 /api → localhost:1800
 
 ## 后台管理平台功能
 
-| 模块 | 功能 |
-|---|---|
-| 系统概览 | 统计卡片（用户/记录/模型/API调用）、服务健康、评估趋势、评分分布、行业分布 |
-| 数据管理 | 评估记录（搜索/筛选/详情/真实结果回填/删除）、回测与数据层触发统计、用户管理（CRUD/重置密码/角色）、指标配置、系统配置（阈值/利率） |
+| 模块     | 功能                                                                                                                                                                                            |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 系统概览 | 统计卡片（用户/记录/模型/API调用）、服务健康、评估趋势、评分分布、行业分布                                                                                                                      |
+| 数据管理 | 评估记录（搜索/筛选/详情/真实结果回填/删除）、回测与数据层触发统计、用户管理（CRUD/重置密码/角色）、指标配置、系统配置（阈值/利率）                                                             |
 | 模型管理 | 训练评分卡（融合样本优先；合成样本路径可选样本量）、指标看板（AUC/KS/混淆矩阵/ROC/KS曲线/IV图/5折CV）、合成样本路径的三组对比实验（替代数据vs传统/WOE vs 分组PCA/涉农专属vs通用）、模型版本历史 |
-| 模型监控 | PSI 群体稳定性、实际客群评分分布、客群迁移预警、模型再校准触发提示 |
-| API 管理 | 接口列表（OpenAPI 聚合）、接口日志（耗时/状态/请求响应）、接口测试控制台 |
-| 系统监控 | 服务器状态（CPU/内存/磁盘实时曲线）、数据库状态（表/容量）、健康检查探针 |
+| 模型监控 | PSI 群体稳定性、实际客群评分分布、客群迁移预警、模型再校准触发提示                                                                                                                              |
+| API 管理 | 接口列表（OpenAPI 聚合）、接口日志（耗时/状态/请求响应）、接口测试控制台                                                                                                                        |
+| 系统监控 | 服务器状态（CPU/内存/磁盘实时曲线）、数据库状态（表/容量）、健康检查探针                                                                                                                        |
 
 ---
 
 ## API 一览（前缀 `/api/v1`）
 
-| 模块 | 接口 | 说明 | 鉴权 |
-|---|---|---|---|
-| 认证 | `POST /auth/login` / `GET /auth/me` | 登录 / 当前用户 | 公开 / 需登录 |
-| 风险评估 | `POST /risk/assess-dynamic` | 动态指标体系评估（专家引擎，支持混合经营） | 公开 |
-| 评估记录 | `GET /risk/records` `GET/DELETE /risk/records/{record_id}` | 本人记录管理 | 需登录 |
-| 数据看板 | `GET /dashboard/stats` `GET /dashboard/industry-distribution` `GET /dashboard/score-distribution` `GET /dashboard/trend` | 统计 | 公开 |
-| 行为验证码 | `GET /captcha` `POST /captcha/check` | 获取 / 验证行为验证码 | 公开 |
-| 真实结果回填 | `PUT /risk/records/{record_id}/outcome` | 回填正常还款 / 逾期 / 未放款 / 待回填 | 本人记录；管理员可回填所有记录 |
-| 真实回测 | `GET /risk/records/backtest/stats` | 回填结果与风险等级交叉统计 | 管理员 |
-| 数据层监控 | `GET /risk/records/data-layer-stats` | 混合触发率与数据层评分统计 | 管理员 |
-| 指标体系 | `GET /indicators/tree` | 指标树（基本项 + 大类→中类→小类→具体营业类型） | 公开 |
-| 管理看板 | `GET /admin/dashboard` | 评估解释、账号行为、真实引擎调用与 API 请求统计 | 管理员 |
-| 模型管理 | `GET /model/info` `POST /model/train` `GET /model/versions` `GET /model/metrics` `GET/PUT /model/thresholds` `GET /model/monitor` | 信息/训练/版本/监控/阈值 | 管理员 |
-| 管理平台 | `/admin/stats` `/admin/users` `/admin/api-logs` `/admin/api-spec` `/admin/configs` `/admin/indicators` | 账号、日志、系统与指标配置管理 | 管理员 |
-| 系统监控 | `GET /monitor/server` `/monitor/database` `/monitor/health` | 服务器/数据库/健康 | 管理员 |
+| 模块         | 接口                                                                                                                                          | 说明                                              | 鉴权                           |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------ |
+| 认证         | `POST /auth/login` / `GET /auth/me`                                                                                                       | 登录 / 当前用户                                   | 公开 / 需登录                  |
+| 风险评估     | `POST /risk/assess-dynamic`                                                                                                                 | 动态指标体系评估（专家引擎，支持混合经营）        | 公开                           |
+| 评估记录     | `GET /risk/records` `GET/DELETE /risk/records/{record_id}`                                                                                | 本人记录管理                                      | 需登录                         |
+| 数据看板     | `GET /dashboard/stats` `GET /dashboard/industry-distribution` `GET /dashboard/score-distribution` `GET /dashboard/trend`              | 统计                                              | 公开                           |
+| 行为验证码   | `GET /captcha` `POST /captcha/check`                                                                                                      | 获取 / 验证行为验证码                             | 公开                           |
+| 真实结果回填 | `PUT /risk/records/{record_id}/outcome`                                                                                                     | 回填正常还款 / 逾期 / 未放款 / 待回填             | 本人记录；管理员可回填所有记录 |
+| 真实回测     | `GET /risk/records/backtest/stats`                                                                                                          | 回填结果与风险等级交叉统计                        | 管理员                         |
+| 数据层监控   | `GET /risk/records/data-layer-stats`                                                                                                        | 混合触发率与数据层评分统计                        | 管理员                         |
+| 指标体系     | `GET /indicators/tree`                                                                                                                      | 指标树（基本项 + 大类→中类→小类→具体营业类型） | 公开                           |
+| 管理看板     | `GET /admin/dashboard`                                                                                                                      | 评估解释、账号行为、真实引擎调用与 API 请求统计   | 管理员                         |
+| 模型管理     | `GET /model/info` `POST /model/train` `GET /model/versions` `GET /model/metrics` `GET/PUT /model/thresholds` `GET /model/monitor` | 信息/训练/版本/监控/阈值                          | 管理员                         |
+| 管理平台     | `/admin/stats` `/admin/users` `/admin/api-logs` `/admin/api-spec` `/admin/configs` `/admin/indicators`                            | 账号、日志、系统与指标配置管理                    | 管理员                         |
+| 系统监控     | `GET /monitor/server` `/monitor/database` `/monitor/health`                                                                             | 服务器/数据库/健康                                | 管理员                         |
 
 登录需先获取并完成验证码，再将 `captchaKey` 与用户名、密码一起提交；测试环境可用 `CAPTCHA_ENABLED=false` 跳过。需登录接口使用 `Authorization: Bearer <token>`。评估记录分页、详情和删除均按当前账号归属限制，包括管理员；回填接口单独允许管理员维护其他账号及匿名记录。公开评估接口有有效 token 时记录账号归属，否则保存为匿名记录。
 
@@ -345,11 +347,11 @@ Compose 只向容器注入 `backend.environment` 中声明的变量，其他 `.e
 
 **仓库约定的部署域名**：
 
-| 服务 | 地址 |
-|---|---|
-| 竞赛前端（fore-end） | https://intellicoretech.cn （Cloudflare Workers 静态资源，Hash 路由） |
-| 后端 API | https://api.intellicoretech.cn （Cloudflare Worker 网关 → 隧道 → 部署环境的后端端口） |
-| 管理平台 | https://backend.intellicoretech.cn/admin |
+| 服务                 | 地址                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| 竞赛前端（fore-end） | https://intellicoretech.cn （Cloudflare Workers 静态资源，Hash 路由）                   |
+| 后端 API             | https://api.intellicoretech.cn （Cloudflare Worker 网关 → 隧道 → 部署环境的后端端口） |
+| 管理平台             | https://backend.intellicoretech.cn/admin                                                |
 
 ### 3. CI/CD 自动部署（GitHub Actions）
 
@@ -382,13 +384,11 @@ graph LR
   cd back-end
   git config core.hooksPath scripts/git-hooks
   ```
-
 - 停用：
 
   ```bash
   git config --unset core.hooksPath
   ```
-
 - 匹配 `app/`、`scripts/`、`admin-web/`、`Dockerfile`、`docker-compose*`、`requirements*` 和部署 workflow；其中 `scripts/` 下文档同样匹配，且本地 `docker-compose*` 范围比云端单个 `docker-compose.yml` 更宽
 - 执行内容：`docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build backend`
 - 说明：hook 只在**本机**生效（`core.hooksPath` 为本地 git 配置），提交不会把"已启用状态"同步给其他开发者，克隆仓库后需各自执行上面的启用命令
@@ -426,17 +426,9 @@ npm run build       # vue-tsc + vite 构建验证
 
 ## 默认账号
 
-| 角色 | 账号 | 密码 |
-|---|---|---|
-| 管理员 | `admin` | `admin123` |
+| 角色   | 账号         | 密码                                         |
+| ------ | ------------ | -------------------------------------------- |
+| 管理员 | `admin`    | `admin123`                                 |
 | 分析师 | `analyst1` | `analyst123`（示例，由管理员在管理端创建） |
 
 > 生产部署前配置随机 `JWT_SECRET_KEY`，并在管理端修改默认管理员密码。首次创建账号可使用 `DEFAULT_ADMIN_*`；本机 Python 从 `.env` 读取，Docker 需按部署一节显式传入。
-
----
-
-## 版权与致谢
-
-- 评分卡方法参考：`Toad-Dev-Group/toad`、`carlo58/optbinning`、`ShichenXie/scorecardpy`
-- 后端结构参考：`tiangolo/full-stack-fastapi-template`
-- 管理端结构参考：`PureAdmin`、`SoybeanAdmin` 等开源后台模板思路
