@@ -7,6 +7,8 @@ Secrets live in `/etc/race3/production.env` (root, mode 600), never in GitHub so
 The stack contains FastAPI plus the admin UI, MySQL 8 and go-captcha-service.
 Only `127.0.0.1:8000` is published. Cloudflare Tunnel forwards
 `backend.intellicoretech.cn` to that listener; the frontend Worker forwards `/api/*` and `/admin/*`.
+Production ingress is managed in Cloudflare. The bundled `cloudflared-config.yml` shows
+the equivalent local ingress rules.
 `/healthz` checks database connectivity; `/docs`, `/redoc` and `/openapi.json` are disabled in production.
 
 Initial provisioning runs `scripts/bootstrap_production.py` against the new database.
@@ -20,14 +22,16 @@ Automatic model training is disabled in production; train and verify models expl
 
 `Backend CI` runs MySQL-backed tests and builds/lints the admin UI. A successful main push
 triggers `Deploy production` for the exact tested SHA. Deployment has a concurrency lock and
-waits for health checks. The SSH key is restricted to the deployment wrapper; the host key is pinned.
+waits for health checks. Actions then checks the public Tunnel origin and the same-origin dashboard
+API through the Worker. The SSH key is restricted to the deployment wrapper; the host key is pinned.
 
 GitHub production environment/repository configuration:
 
 - Variables: `SERVER_HOST`, `SERVER_USER`.
 - Secrets: `DEPLOY_SSH_KEY`, `SERVER_KNOWN_HOSTS`.
 - Default Actions permissions: read-only; PR approvals by Actions disabled.
-- Main requires the `test` and `admin` checks; force pushes and branch deletion disabled.
+- Main requires an approving review and the `test`, `admin` and configured CodeQL checks.
+  Force pushes and branch deletion are disabled.
 
 `deploy-backend.sh main <SHA>` rebuilds the backend without removing volumes or reimporting
 existing indicators. It accepts only a SHA already contained in origin/main.

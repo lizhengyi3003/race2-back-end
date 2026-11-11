@@ -28,6 +28,6 @@
 - `read_docx.py`：使用 Python 标准库提取 DOCX 文本，可按标题、关键词或段落范围查看。
 - `gen_chapter3_diagrams.py`：生成第三章架构图与操作流程图，输出到 `docs/第三章配图/`；需安装开发依赖中的 matplotlib。
 
-`data/requirements-venv-snapshot.txt` 是历史本地环境快照，供复现参考；日常安装以 `requirements.txt` 和 `requirements-dev.txt` 为准。
+`data/venv-snapshot.md` 是历史本地环境快照，供复现参考；日常安装以 `requirements.txt` 和 `requirements-dev.txt` 为准。
 
 论文方案、论文参考报告/问卷/代码本已归入工作区根 `docs/`，见[参考资料索引](../../docs/参考资料索引.md)。检查缓存、虚拟环境和脚本输出留在后端目录内，分别使用 `.ruff_cache/`、`.venv/`、`data/` 或脚本指定的 `docs/第三章配图/`。

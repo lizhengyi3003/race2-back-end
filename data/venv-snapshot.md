@@ -1,3 +1,8 @@
+# 历史本地环境快照
+
+以下是旧环境的原始版本记录，供追溯使用。当前安装和安全更新以根目录的 `requirements.txt` 和 `requirements-dev.txt` 为准。
+
+```text
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1
@@ -60,3 +65,4 @@ uvicorn==0.53.0
 watchfiles==1.2.0
 websockets==17.1
 wrapt==2.4.1
+```

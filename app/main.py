@@ -98,6 +98,9 @@ def create_app() -> FastAPI:
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault("Referrer-Policy", "same-origin")
         response.headers.setdefault("X-XSS-Protection", "1; mode=block")
+        response.headers.append(
+            "Link", '<https://github.com/lizhengyi3003/race2-back-end>; rel="related"; title="Source code"'
+        )
         return response
 
     # ---------- 异常处理 ----------

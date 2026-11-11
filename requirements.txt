@@ -13,7 +13,7 @@ pydantic>=2.9.0,<3.0.0
 pydantic-settings>=2.4.0,<3.0.0
 
 # 认证
-python-jose[cryptography]>=3.5.0,<4.0.0
+PyJWT[crypto]>=2.15.0,<3.0.0
 bcrypt>=4.0.1,<6.0.0
 
 # 数据处理与建模（信用评分卡：IV筛选 + WOE编码 + Logistic回归）
@@ -31,4 +31,5 @@ openpyxl>=3.1.5,<4.0.0
 
 # AI 复核：OpenAI Responses（同时支持兼容入口）
 openai>=2.54.0,<3
+certifi>=2026.10.18
 jiter>=0.10,<1

@@ -33,3 +33,10 @@ jobs:
           printf '%s\n' "$SERVER_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy ~/.ssh/known_hosts
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -i ~/.ssh/deploy "$SERVER_USER@$SERVER_HOST" "deploy-backend.sh main $REVISION"
+      - name: Verify the public origin and API gateway
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 15 --retry 4 --retry-all-errors https://backend.intellicoretech.cn/healthz |
+            jq -e '.status == "ok" and .service == null'
+          curl --fail --silent --show-error --max-time 15 --retry 4 --retry-all-errors https://intellicoretech.cn/api/v1/dashboard/stats |
+            jq -e '.code == 200 and (.data.totalAssess | type == "number")'
