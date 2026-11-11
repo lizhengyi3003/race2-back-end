@@ -30,5 +30,5 @@ psutil>=6.0.0,<8.0.0
 openpyxl>=3.1.5,<4.0.0
 
 # AI 复核：OpenAI Responses（同时支持兼容入口）
-openai>=2.54.0,<3
+openai>=3.46.0,<4
 jiter>=0.10,<1
